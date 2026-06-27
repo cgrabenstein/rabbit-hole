@@ -129,6 +129,44 @@ export async function getArticle(
   });
 }
 
+// ── Delete ──
+
+export async function deleteSource(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(
+      [STORE_SOURCES, STORE_ARTICLES, STORE_RELATIONSHIPS],
+      "readwrite"
+    );
+
+    // Delete source
+    tx.objectStore(STORE_SOURCES).delete(id);
+
+    // Delete cached article
+    tx.objectStore(STORE_ARTICLES).delete(id);
+
+    // Delete relationships where this source is involved
+    const relStore = tx.objectStore(STORE_RELATIONSHIPS);
+    const sourceIndex = relStore.index("sourceId");
+    const targetIndex = relStore.index("targetId");
+
+    sourceIndex.getAll(id).onsuccess = (e) => {
+      const rels = (e.target as IDBRequest<Relationship[]>).result;
+      rels.forEach((r) => relStore.delete(r.id!));
+    };
+    targetIndex.getAll(id).onsuccess = (e) => {
+      const rels = (e.target as IDBRequest<Relationship[]>).result;
+      rels.forEach((r) => relStore.delete(r.id!));
+    };
+
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 // ── Relationships ──
 
 export async function addRelationship(

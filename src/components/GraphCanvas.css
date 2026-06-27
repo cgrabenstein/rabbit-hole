@@ -20,21 +20,23 @@
   cursor: grabbing;
 }
 
-.graph__node {
-  fill: #6c63ff;
-  stroke: #8b83ff;
+/* ── card-style nodes ── */
+
+.graph__card {
+  fill: #1e1e3a;
+  stroke: #3a3a6a;
   stroke-width: 1.5;
   cursor: pointer;
-  transition: r 0.15s ease;
+  transition: fill 0.15s ease, stroke 0.15s ease;
 }
 
-.graph__node:hover {
-  r: 14;
-  fill: #7b73ff;
+.graph__card:hover {
+  fill: #2a2a5a;
+  stroke: #6c63ff;
 }
 
 .graph__label {
-  fill: #cbd5e1;
+  fill: #e0e0f0;
   font-size: 11px;
   font-family: system-ui, -apple-system, sans-serif;
   pointer-events: none;

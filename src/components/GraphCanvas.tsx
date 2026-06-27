@@ -14,8 +14,6 @@ interface ViewTransform {
   scale: number;
 }
 
-const NODE_RADIUS = 10;
-
 function GraphCanvasInner({ sources, onSelectSource }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -41,50 +39,121 @@ function GraphCanvasInner({ sources, onSelectSource }: GraphCanvasProps) {
     setNodes(laid);
   }, [sources, dimensions]);
 
-  // ── pan / zoom ──
+  // ── pan / zoom state ──
   const [transform, setTransform] = useState<ViewTransform>({
     x: 0,
     y: 0,
     scale: 1,
   });
-  const panning = useRef(false);
-  const panAnchor = useRef({ x: 0, y: 0 });
 
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      const target = e.target as Element;
-      if (
-        target === svgRef.current ||
-        target.classList.contains("graph__layer") ||
-        target.classList.contains("graph__bg")
-      ) {
-        panning.current = true;
-        panAnchor.current = {
-          x: e.clientX - transform.x,
-          y: e.clientY - transform.y,
+  // Refs to avoid stale closures in native event handlers
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
+
+  const panningRef = useRef(false);
+  const panAnchorRef = useRef({ x: 0, y: 0 });
+
+  // ── pinch zoom state ──
+  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchDistRef = useRef(0);
+
+  // ── native pointer events (supports multi-touch for pinch zoom) ──
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      activePointers.current.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      if (activePointers.current.size === 1) {
+        // Single pointer → pan
+        const t = transformRef.current;
+        panningRef.current = true;
+        panAnchorRef.current = {
+          x: e.clientX - t.x,
+          y: e.clientY - t.y,
         };
-        (e.target as Element).setPointerCapture?.(e.pointerId);
+      } else if (activePointers.current.size === 2) {
+        // Two pointers → pinch zoom start
+        const pts = [...activePointers.current.values()];
+        pinchDistRef.current = Math.hypot(
+          pts[1].x - pts[0].x,
+          pts[1].y - pts[0].y
+        );
       }
-    },
-    [transform]
-  );
+    };
 
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!panning.current) return;
-      setTransform((t) => ({
-        ...t,
-        x: e.clientX - panAnchor.current.x,
-        y: e.clientY - panAnchor.current.y,
-      }));
-    },
-    []
-  );
+    const onPointerMove = (e: PointerEvent) => {
+      const prev = activePointers.current.get(e.pointerId);
+      if (!prev) return;
 
-  const handlePointerUp = useCallback(() => {
-    panning.current = false;
+      if (activePointers.current.size === 1 && panningRef.current) {
+        // Pan
+        setTransform((t) => ({
+          ...t,
+          x: e.clientX - panAnchorRef.current.x,
+          y: e.clientY - panAnchorRef.current.y,
+        }));
+      } else if (activePointers.current.size === 2) {
+        // Pinch zoom
+        const pts = [...activePointers.current.values()];
+        const dist = Math.hypot(
+          pts[1].x - pts[0].x,
+          pts[1].y - pts[0].y
+        );
+
+        setTransform((t) => {
+          const factor = dist / pinchDistRef.current;
+          const newScale = Math.min(5, Math.max(0.15, t.scale * factor));
+
+          // Zoom towards midpoint of the two fingers
+          const midX = (pts[0].x + pts[1].x) / 2;
+          const midY = (pts[0].y + pts[1].y) / 2;
+          const rect = svg.getBoundingClientRect();
+          const mx = midX - rect.left;
+          const my = midY - rect.top;
+          const nx = mx - (mx - t.x) * (newScale / t.scale);
+          const ny = my - (my - t.y) * (newScale / t.scale);
+
+          return { x: nx, y: ny, scale: newScale };
+        });
+
+        pinchDistRef.current = dist;
+      }
+
+      // Update stored position
+      activePointers.current.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY,
+      });
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      activePointers.current.delete(e.pointerId);
+      if (activePointers.current.size === 0) {
+        panningRef.current = false;
+      }
+    };
+
+    svg.addEventListener("pointerdown", onPointerDown);
+    svg.addEventListener("pointermove", onPointerMove);
+    svg.addEventListener("pointerup", onPointerUp);
+    svg.addEventListener("pointercancel", onPointerUp);
+    svg.addEventListener("pointerleave", onPointerUp);
+
+    return () => {
+      svg.removeEventListener("pointerdown", onPointerDown);
+      svg.removeEventListener("pointermove", onPointerMove);
+      svg.removeEventListener("pointerup", onPointerUp);
+      svg.removeEventListener("pointercancel", onPointerUp);
+      svg.removeEventListener("pointerleave", onPointerUp);
+    };
   }, []);
 
+  // ── scroll-wheel zoom (desktop) ──
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -100,7 +169,7 @@ function GraphCanvasInner({ sources, onSelectSource }: GraphCanvasProps) {
     });
   }, []);
 
-  // ── node click opens detail panel ──
+  // ── node click opens reading view ──
   const handleNodeClick = useCallback(
     (e: React.MouseEvent, source: Source) => {
       e.stopPropagation();
@@ -109,15 +178,19 @@ function GraphCanvasInner({ sources, onSelectSource }: GraphCanvasProps) {
     [onSelectSource]
   );
 
+  // ── card dimensions per title ──
+  const CARD_PAD_X = 14;
+  const CARD_PAD_Y = 8;
+  const CARD_RADIUS = 8;
+  const FONT_SIZE = 11;
+  const CHAR_W = 6.5;
+  const MAX_CHARS = 40;
+
   return (
     <div className="graph-canvas" ref={containerRef}>
       <svg
         ref={svgRef}
         className="graph-canvas__svg"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
         onWheel={handleWheel}
       >
         <rect
@@ -134,22 +207,41 @@ function GraphCanvasInner({ sources, onSelectSource }: GraphCanvasProps) {
           {nodes.map((node) => {
             const source = sources.find((s) => s.id === node.id);
             if (!source) return null;
+
+            const label =
+              source.title.length > MAX_CHARS
+                ? source.title.slice(0, MAX_CHARS) + "…"
+                : source.title;
+
+            const textW = label.length * CHAR_W;
+            const cardW = textW + CARD_PAD_X * 2;
+            const cardH = FONT_SIZE + CARD_PAD_Y * 2;
+
+            const cx = node.x ?? 0;
+            const cy = node.y ?? 0;
+
             return (
-              <g key={node.id} onClick={(e) => handleNodeClick(e, source)} style={{cursor: 'pointer'}}>
-                <circle
-                  className="graph__node"
-                  cx={node.x ?? 0}
-                  cy={node.y ?? 0}
-                  r={NODE_RADIUS}
+              <g
+                key={node.id}
+                onClick={(e) => handleNodeClick(e, source)}
+                style={{ cursor: "pointer" }}
+              >
+                <rect
+                  className="graph__card"
+                  x={cx - cardW / 2}
+                  y={cy - cardH / 2}
+                  width={cardW}
+                  height={cardH}
+                  rx={CARD_RADIUS}
+                  ry={CARD_RADIUS}
                 />
                 <text
                   className="graph__label"
-                  x={(node.x ?? 0) + NODE_RADIUS + 6}
-                  y={(node.y ?? 0) + 4}
+                  x={cx}
+                  y={cy + FONT_SIZE / 2 - 1}
+                  textAnchor="middle"
                 >
-                  {source.title.length > 35
-                    ? source.title.slice(0, 35) + "…"
-                    : source.title}
+                  {label}
                 </text>
               </g>
             );

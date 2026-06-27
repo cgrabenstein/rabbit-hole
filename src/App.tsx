@@ -7,7 +7,7 @@ import { EmptyState } from "./components/EmptyState";
 import { Toast, type ToastMessage } from "./components/Toast";
 import { useSources } from "./hooks/useSources";
 import { fetchTitle } from "./api/fetchTitle";
-import { addSource } from "./db";
+import { addSource, deleteSource } from "./db";
 import type { Source } from "./db/types";
 import "./App.css";
 
@@ -65,8 +65,8 @@ export default function App() {
 
   const handleNodeClick = useCallback(
     (source: Source) => {
-      // Always attempt reading — ReadingView falls back to SourceDetail if unreadable
-      setReadingSourceId(source.id!);
+      // Open detail panel first — user can choose to read from there
+      setSelectedSource(source);
     },
     []
   );
@@ -76,15 +76,34 @@ export default function App() {
   }, []);
 
   const handleReadingFallback = useCallback(
-    (source: Source) => {
+    (_source: Source) => {
+      // selectedSource is already set (detail panel is open), just close reading
       setReadingSourceId(null);
-      setSelectedSource(source);
     },
     []
   );
 
   const handleClosePanel = useCallback(() => {
     setSelectedSource(null);
+  }, []);
+
+  const handleDeleteSource = useCallback(
+    async (source: Source) => {
+      try {
+        await deleteSource(source.id!);
+        addToast(`Deleted: ${source.title}`, "success");
+        setSelectedSource(null);
+        refresh();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addToast(msg, "error");
+      }
+    },
+    [addToast, refresh]
+  );
+
+  const handleReadSource = useCallback((source: Source) => {
+    setReadingSourceId(source.id!);
   }, []);
 
   // ── On mount, check for shared URL from Web Share Target ──
@@ -163,7 +182,12 @@ export default function App() {
 
         {/* ── detail panel ── */}
         {selectedSource && (
-          <SourceDetail source={selectedSource} onClose={handleClosePanel} />
+          <SourceDetail
+            source={selectedSource}
+            onClose={handleClosePanel}
+            onDelete={handleDeleteSource}
+            onRead={handleReadSource}
+          />
         )}
       </div>
 

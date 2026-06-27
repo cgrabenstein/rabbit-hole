@@ -5,6 +5,8 @@ import "./SourceDetail.css";
 interface SourceDetailProps {
   source: Source;
   onClose: () => void;
+  onDelete?: (source: Source) => void;
+  onRead?: (source: Source) => void;
 }
 
 function formatDate(iso?: string): string {
@@ -20,7 +22,7 @@ function formatDate(iso?: string): string {
   }
 }
 
-export function SourceDetail({ source, onClose }: SourceDetailProps) {
+export function SourceDetail({ source, onClose, onDelete, onRead }: SourceDetailProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,6 +60,29 @@ export function SourceDetail({ source, onClose }: SourceDetailProps) {
 
         <div className="detail-panel__body">
           <h2 className="detail-panel__title">{source.title}</h2>
+
+          <div className="detail-panel__actions">
+            {onRead && (
+              <button
+                className="detail-panel__read"
+                onClick={() => onRead(source)}
+              >
+                Read
+              </button>
+            )}
+            {onDelete && (
+              <button
+                className="detail-panel__delete"
+                onClick={() => {
+                  if (window.confirm(`Delete "${source.title.slice(0, 60)}"?`)) {
+                    onDelete(source);
+                  }
+                }}
+              >
+                Delete
+              </button>
+            )}
+          </div>
 
           <a
             className="detail-panel__url"
