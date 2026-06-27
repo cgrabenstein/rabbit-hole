@@ -4,6 +4,13 @@ import { precacheAndRoute } from "workbox-precaching";
 // Inject Workbox precache manifest (replaced at build time)
 precacheAndRoute(self.__WB_MANIFEST);
 
+// ── Auto-update: skip waiting when a new SW is detected ──
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 // ── Web Share Target ──
 // Intercept POST to /share-target and redirect the shared URL to the app
 self.addEventListener("fetch", (event) => {
