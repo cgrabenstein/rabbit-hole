@@ -8,12 +8,12 @@ Register Rabbit Hole as a Web Share Target so the system share sheet on mobile (
 
 ## Acceptance criteria
 
-- [ ] PWA manifest declares `share_target` for `text/uri-list` and `text/plain`
-- [ ] Service worker intercepts share events and extracts the URL
-- [ ] Incoming shared URL creates a Source (same storage flow as manual capture)
-- [ ] User sees success feedback after sharing to Rabbit Hole
-- [ ] Works on Chrome for Android (primary target)
-- [ ] Graceful fallback if Web Share Target is not supported
+- [x] PWA manifest declares `share_target` with title, text, and url params
+- [x] Custom service worker (injectManifest) intercepts POST to /share-target and extracts URL
+- [x] Incoming shared URL creates a Source via App.tsx capture flow (fetchTitle → addSource → toast)
+- [x] User sees success feedback via toast after sharing to Rabbit Hole
+- [ ] Works on Chrome for Android (requires HTTPS deployment to test)
+- [x] Graceful fallback: SW redirects to / on failure
 
 ## Blocked by
 

@@ -6,6 +6,8 @@ import { ReadingView } from "./components/ReadingView";
 import { EmptyState } from "./components/EmptyState";
 import { Toast, type ToastMessage } from "./components/Toast";
 import { useSources } from "./hooks/useSources";
+import { fetchTitle } from "./api/fetchTitle";
+import { addSource } from "./db";
 import type { Source } from "./db/types";
 import "./App.css";
 
@@ -45,6 +47,22 @@ export default function App() {
     [addToast]
   );
 
+  // ── Handle incoming shared URL from Web Share Target ──
+  const captureSharedUrl = useCallback(
+    async (url: string) => {
+      try {
+        const { title } = await fetchTitle(url);
+        await addSource({ url, title, createdAt: new Date().toISOString() });
+        addToast(`Captured: ${title}`, "success");
+        refresh();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addToast(msg, "error");
+      }
+    },
+    [addToast, refresh]
+  );
+
   const handleNodeClick = useCallback(
     (source: Source) => {
       // Always attempt reading — ReadingView falls back to SourceDetail if unreadable
@@ -68,6 +86,18 @@ export default function App() {
   const handleClosePanel = useCallback(() => {
     setSelectedSource(null);
   }, []);
+
+  // ── On mount, check for shared URL from Web Share Target ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedUrl = params.get("shared_url");
+    if (!sharedUrl) return;
+
+    // Clean up URL immediately so refresh doesn't re-trigger
+    window.history.replaceState({}, "", "/");
+
+    captureSharedUrl(sharedUrl);
+  }, [captureSharedUrl]);
 
   // Browser back button closes reading view
   useEffect(() => {

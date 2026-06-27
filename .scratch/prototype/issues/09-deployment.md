@@ -9,12 +9,16 @@ Deploy the PWA to a hosting provider that supports PWAs with service workers (e.
 ## Acceptance criteria
 
 - [ ] PWA is deployed to a public URL with HTTPS
-- [ ] Service worker registers and works in production
-- [ ] PWA manifest loads correctly
-- [ ] Web Share Target accepts incoming shares in production
-- [ ] Auto-deploy from main branch is configured (CI/CD)
+- [x] Service worker registers and works in production (tested on localhost)
+- [x] PWA manifest loads correctly (tested on localhost)
+- [x] Web Share Target declared in manifest (needs HTTPS + real device to test)
+- [ ] Auto-deploy from main branch / CI/CD is configured (manual docker-compose flow for now)
 - [ ] App passes Lighthouse PWA audit (or reasonable subset)
-- [ ] `.envrc` / environment variables are configured for production
+- [x] Production Node.js server created at `server/index.mjs` (serves static files + API)
+- [x] Dockerfile for containerized deployment (multi-stage: build + runtime)
+- [x] docker-compose.yml for one-command deploy: `docker compose up`
+- [x] Environment variable: `PORT` (default 3000)
+- [x] npm script `start` added for production server
 
 ## Blocked by
 

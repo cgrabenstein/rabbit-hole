@@ -106,7 +106,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: "injectManifest",
       registerType: "autoUpdate",
+      srcDir: "src",
+      filename: "sw.js",
       includeAssets: ["favicon.svg"],
       manifest: {
         name: "Rabbit Hole",
@@ -120,6 +123,16 @@ export default defineConfig({
           { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
         ],
+        share_target: {
+          action: "/share-target",
+          method: "POST",
+          enctype: "application/x-www-form-urlencoded",
+          params: {
+            title: "title",
+            text: "text",
+            url: "url",
+          },
+        },
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
