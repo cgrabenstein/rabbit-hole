@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # Graph canvas with auto-layout
 

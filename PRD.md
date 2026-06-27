@@ -100,6 +100,18 @@ Users should feel like they are navigating a map rather than managing files.
 
 ---
 
+### Reading Is Discovery
+
+The graph grows naturally through the act of reading.
+
+Every article contains links to other ideas.
+
+Clicking a link while reading captures the target, establishes a relationship, and expands the map — without leaving the current article.
+
+Relationships are not extracted by a server. They are discovered by the reader.
+
+---
+
 ### Relationships Are First-Class
 
 An article rarely matters in isolation.
