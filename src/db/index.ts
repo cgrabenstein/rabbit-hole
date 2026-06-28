@@ -200,6 +200,16 @@ export async function getRelationshipsForSource(
   });
 }
 
+export async function deleteRelationship(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_RELATIONSHIPS, "readwrite");
+    tx.objectStore(STORE_RELATIONSHIPS).delete(id);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function getAllRelationships(): Promise<Relationship[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {

@@ -10,6 +10,7 @@ interface GraphCanvasProps {
   onRead: (source: Source) => void;
   onDelete: (source: Source) => void;
   onConnect: (sourceA: Source, sourceB: Source) => void;
+  onRemoveConnection: (relationshipId: number) => void;
   onDetails?: (source: Source) => void;
 }
 
@@ -70,6 +71,7 @@ function GraphCanvasInner({
   onRead,
   onDelete,
   onConnect,
+  onRemoveConnection,
   onDetails,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -394,19 +396,41 @@ function GraphCanvasInner({
       )}
 
       {/* ── node popover ── */}
-      {selectedSource && (
-        <NodePopover
-          source={selectedSource}
-          x={popoverPos.x}
-          y={popoverPos.y}
-          above={popoverPos.above}
-          onRead={handlePopoverRead}
-          onLink={handlePopoverLink}
-          onDelete={handlePopoverDelete}
-          onDetails={handlePopoverDetails}
-          onClose={handlePopoverClose}
-        />
-      )}
+      {selectedSource && (() => {
+        const conns = relationships
+          .filter(
+            (r) =>
+              r.sourceId === selectedSource.id ||
+              r.targetId === selectedSource.id
+          )
+          .map((r) => {
+            const otherId =
+              r.sourceId === selectedSource.id
+                ? r.targetId
+                : r.sourceId;
+            const other = sources.find((s) => s.id === otherId);
+            return {
+              relationshipId: r.id!,
+              title: other?.title ?? "Unknown",
+            };
+          });
+
+        return (
+          <NodePopover
+            source={selectedSource}
+            x={popoverPos.x}
+            y={popoverPos.y}
+            above={popoverPos.above}
+            connections={conns}
+            onRead={handlePopoverRead}
+            onLink={handlePopoverLink}
+            onDelete={handlePopoverDelete}
+            onRemoveConnection={onRemoveConnection}
+            onDetails={handlePopoverDetails}
+            onClose={handlePopoverClose}
+          />
+        );
+      })()}
     </div>
   );
 }

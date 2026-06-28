@@ -1,17 +1,21 @@
 import type { Source } from "../db/types";
 import "./NodePopover.css";
 
+interface PopoverConnection {
+  relationshipId: number;
+  title: string;
+}
+
 interface NodePopoverProps {
   source: Source;
-  /** Left edge of popover (px, relative to container) */
   x: number;
-  /** Top edge of card (above=true) or bottom edge of card (above=false) */
   y: number;
-  /** Whether the popover sits above or below the card */
   above: boolean;
+  connections?: PopoverConnection[];
   onRead: (source: Source) => void;
   onLink: (source: Source) => void;
   onDelete: (source: Source) => void;
+  onRemoveConnection: (relationshipId: number) => void;
   onDetails?: (source: Source) => void;
   onClose: () => void;
 }
@@ -21,9 +25,11 @@ export function NodePopover({
   x,
   y,
   above,
+  connections,
   onRead,
   onLink,
   onDelete,
+  onRemoveConnection,
   onDetails,
   onClose,
 }: NodePopoverProps) {
@@ -70,6 +76,29 @@ export function NodePopover({
             Delete
           </button>
         </div>
+
+        {/* ── connected sources ── */}
+        {connections && connections.length > 0 && (
+          <div className="popover__connections">
+            <span className="popover__connections-label">Connected</span>
+            {connections.map((c) => (
+              <div key={c.relationshipId} className="popover__connection-row">
+                <span className="popover__connection-title">
+                  {c.title.length > 35
+                    ? c.title.slice(0, 35) + "…"
+                    : c.title}
+                </span>
+                <button
+                  className="popover__connection-remove"
+                  onClick={() => onRemoveConnection(c.relationshipId)}
+                  aria-label="Remove connection"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

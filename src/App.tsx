@@ -11,6 +11,7 @@ import {
   addSource,
   deleteSource,
   addRelationship,
+  deleteRelationship,
   getAllRelationships,
 } from "./db";
 import type { Source, Relationship } from "./db/types";
@@ -122,9 +123,23 @@ export default function App() {
           createdAt: new Date().toISOString(),
         });
         addToast(`Connected: ${sourceA.title.slice(0, 30)} → ${sourceB.title.slice(0, 30)}`, "success");
-        // Re-fetch relationships
         const updated = await getAllRelationships();
         setRelationships(updated);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addToast(msg, "error");
+      }
+    },
+    [addToast]
+  );
+
+  const handleRemoveConnection = useCallback(
+    async (relationshipId: number) => {
+      try {
+        await deleteRelationship(relationshipId);
+        const updated = await getAllRelationships();
+        setRelationships(updated);
+        addToast("Connection removed", "success");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         addToast(msg, "error");
@@ -207,6 +222,7 @@ export default function App() {
               onRead={handleReadSource}
               onDelete={handleDeleteSource}
               onConnect={handleConnect}
+              onRemoveConnection={handleRemoveConnection}
               onDetails={handleDetailsSource}
             />
           </div>
