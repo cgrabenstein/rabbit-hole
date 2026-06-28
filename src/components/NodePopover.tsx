@@ -3,11 +3,12 @@ import "./NodePopover.css";
 
 interface NodePopoverProps {
   source: Source;
-  /** Position relative to the canvas container (px) */
+  /** Left edge of popover (px, relative to container) */
   x: number;
+  /** Top edge of card (above=true) or bottom edge of card (above=false) */
   y: number;
-  /** Y position of the node's center (for orientation) — above if room, below if near top edge */
-  nodeCenterY: number;
+  /** Whether the popover sits above or below the card */
+  above: boolean;
   onRead: (source: Source) => void;
   onLink: (source: Source) => void;
   onDelete: (source: Source) => void;
@@ -19,28 +20,21 @@ export function NodePopover({
   source,
   x,
   y,
-  nodeCenterY,
+  above,
   onRead,
   onLink,
   onDelete,
   onDetails,
   onClose,
 }: NodePopoverProps) {
-  // Popover opens above the card by default; if near top edge, open below
-  const above = nodeCenterY > 160;
-  const popY = above ? y : y + 20;
-  const arrowDir = above ? "down" : "up";
-
   return (
     <>
-      {/* Invisible backdrop to catch clicks outside */}
       <div className="popover__backdrop" onClick={onClose} />
       <div
-        className="popover"
-        style={{ left: x, top: popY }}
+        className={`popover popover--${above ? "above" : "below"}`}
+        style={{ left: x, top: y }}
       >
-        {/* Arrow pointing to the node */}
-        <div className={`popover__arrow popover__arrow--${arrowDir}`} />
+        <div className={`popover__arrow popover__arrow--${above ? "down" : "up"}`} />
 
         <div className="popover__header">
           <span className="popover__title">

@@ -278,18 +278,21 @@ function GraphCanvasInner({
   // ── rendering helpers ──
 
   // Popover position for the selected node
-  let popoverPos = { x: 0, y: 0 };
-  let nodeCenterY = 0;
+  let popoverPos = { x: 0, y: 0, above: true };
   if (selectedSource) {
     const node = getNode(selectedSource.id!);
     if (node) {
       const { cardH } = getCardDimensions(selectedSource.title);
       const scr = nodeToScreen(node.x ?? 0, node.y ?? 0, transform);
+      const cardTopY = scr.y - (cardH / 2) * transform.scale;
+      const cardBottomY = scr.y + (cardH / 2) * transform.scale;
+      const above = scr.y > 160;
+
       popoverPos = {
-        x: scr.x,
-        y: scr.y - (cardH / 2) * transform.scale,
+        x: scr.x - 20, // arrow (left:20) aligns with card center
+        y: above ? cardTopY : cardBottomY,
+        above,
       };
-      nodeCenterY = scr.y;
     }
   }
 
@@ -396,7 +399,7 @@ function GraphCanvasInner({
           source={selectedSource}
           x={popoverPos.x}
           y={popoverPos.y}
-          nodeCenterY={nodeCenterY}
+          above={popoverPos.above}
           onRead={handlePopoverRead}
           onLink={handlePopoverLink}
           onDelete={handlePopoverDelete}
