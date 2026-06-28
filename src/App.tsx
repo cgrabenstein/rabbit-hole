@@ -7,8 +7,13 @@ import { EmptyState } from "./components/EmptyState";
 import { Toast, type ToastMessage } from "./components/Toast";
 import { useSources } from "./hooks/useSources";
 import { fetchTitle } from "./api/fetchTitle";
-import { addSource, deleteSource } from "./db";
-import type { Source } from "./db/types";
+import {
+  addSource,
+  deleteSource,
+  addRelationship,
+  getAllRelationships,
+} from "./db";
+import type { Source, Relationship } from "./db/types";
 import "./App.css";
 
 export default function App() {
@@ -16,8 +21,14 @@ export default function App() {
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showCapture, setShowCapture] = useState(false);
-  const [selectedSource, setSelectedSource] = useState<Source | null>(null);
+  const [detailSource, setDetailSource] = useState<Source | null>(null);
   const [readingSourceId, setReadingSourceId] = useState<number | null>(null);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
+
+  // ── Fetch relationships ──
+  useEffect(() => {
+    getAllRelationships().then(setRelationships);
+  }, [sources]);
 
   const addToast = useCallback(
     (text: string, variant: ToastMessage["variant"]) => {
@@ -63,13 +74,7 @@ export default function App() {
     [addToast, refresh]
   );
 
-  const handleNodeClick = useCallback(
-    (source: Source) => {
-      // Open detail panel first — user can choose to read from there
-      setSelectedSource(source);
-    },
-    []
-  );
+  // Popover is managed inside GraphCanvas
 
   const handleReadingBack = useCallback(() => {
     setReadingSourceId(null);
@@ -77,14 +82,13 @@ export default function App() {
 
   const handleReadingFallback = useCallback(
     (_source: Source) => {
-      // selectedSource is already set (detail panel is open), just close reading
       setReadingSourceId(null);
     },
     []
   );
 
   const handleClosePanel = useCallback(() => {
-    setSelectedSource(null);
+    setDetailSource(null);
   }, []);
 
   const handleDeleteSource = useCallback(
@@ -92,7 +96,6 @@ export default function App() {
       try {
         await deleteSource(source.id!);
         addToast(`Deleted: ${source.title}`, "success");
-        setSelectedSource(null);
         refresh();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -105,6 +108,30 @@ export default function App() {
   const handleReadSource = useCallback((source: Source) => {
     setReadingSourceId(source.id!);
   }, []);
+
+  const handleDetailsSource = useCallback((source: Source) => {
+    setDetailSource(source);
+  }, []);
+
+  const handleConnect = useCallback(
+    async (sourceA: Source, sourceB: Source) => {
+      try {
+        await addRelationship({
+          sourceId: sourceA.id!,
+          targetId: sourceB.id!,
+          createdAt: new Date().toISOString(),
+        });
+        addToast(`Connected: ${sourceA.title.slice(0, 30)} → ${sourceB.title.slice(0, 30)}`, "success");
+        // Re-fetch relationships
+        const updated = await getAllRelationships();
+        setRelationships(updated);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addToast(msg, "error");
+      }
+    },
+    [addToast]
+  );
 
   // ── On mount, check for shared URL from Web Share Target ──
   useEffect(() => {
@@ -174,16 +201,23 @@ export default function App() {
         {/* ── graph area ── */}
         {hasSources ? (
           <div className="app__graph-area">
-            <GraphCanvas sources={sources} onSelectSource={handleNodeClick} />
+            <GraphCanvas
+              sources={sources}
+              relationships={relationships}
+              onRead={handleReadSource}
+              onDelete={handleDeleteSource}
+              onConnect={handleConnect}
+              onDetails={handleDetailsSource}
+            />
           </div>
         ) : (
           <EmptyState />
         )}
 
-        {/* ── detail panel ── */}
-        {selectedSource && (
+        {/* ── detail panel (full metadata, opened from popover Details) ── */}
+        {detailSource && (
           <SourceDetail
-            source={selectedSource}
+            source={detailSource}
             onClose={handleClosePanel}
             onDelete={handleDeleteSource}
             onRead={handleReadSource}

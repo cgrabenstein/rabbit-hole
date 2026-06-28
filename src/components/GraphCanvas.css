@@ -20,8 +20,22 @@
   cursor: grabbing;
 }
 
-/* ── card-style nodes ── */
+/* Linking cursor */
+.graph-canvas__svg--linking {
+  cursor: crosshair !important;
+}
+.graph-canvas__svg--linking:active {
+  cursor: crosshair !important;
+}
 
+/* ── relationship lines ── */
+.graph__rel {
+  stroke: #4a4a7a;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+/* ── card-style nodes ── */
 .graph__card {
   fill: #1e1e3a;
   stroke: #3a3a6a;
@@ -35,10 +49,55 @@
   stroke: #6c63ff;
 }
 
+/* Linking mode — pulsing border */
+.graph__card--linking {
+  fill: #2a2a5a;
+  stroke: #4fc3f7;
+  stroke-width: 2.5;
+  animation: pulse-link 1s ease-in-out infinite;
+}
+
+@keyframes pulse-link {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.4; }
+}
+
+/* Selected node (popover open) */
+.graph__card--selected {
+  fill: #2a2a5a;
+  stroke: #6c63ff;
+  stroke-width: 2;
+}
+
 .graph__label {
   fill: #e0e0f0;
   font-size: 11px;
   font-family: system-ui, -apple-system, sans-serif;
   pointer-events: none;
   user-select: none;
+}
+
+/* ── linking mode hint ── */
+.graph-canvas__hint {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  padding: 8px 20px;
+  background: #1e1e3a;
+  border: 1px solid #4fc3f7;
+  border-radius: 20px;
+  color: #4fc3f7;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: hint-in 0.2s ease;
+}
+
+@keyframes hint-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }

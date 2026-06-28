@@ -199,3 +199,15 @@ export async function getRelationshipsForSource(
     tx.oncomplete = () => db.close();
   });
 }
+
+export async function getAllRelationships(): Promise<Relationship[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_RELATIONSHIPS, "readonly");
+    const store = tx.objectStore(STORE_RELATIONSHIPS);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => db.close();
+  });
+}
