@@ -20,6 +20,11 @@
   cursor: grabbing;
 }
 
+/* Background rect — catches canvas background clicks */
+.graph__bg {
+  pointer-events: fill;
+}
+
 /* Linking cursor */
 .graph-canvas__svg--linking {
   cursor: crosshair !important;

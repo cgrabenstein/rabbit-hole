@@ -307,7 +307,6 @@ function GraphCanvasInner({
         ref={svgRef}
         className={`graph-canvas__svg ${linkingSource ? "graph-canvas__svg--linking" : ""}`}
         onWheel={handleWheel}
-        onClick={handleBgClick}
       >
         <defs>
           <marker
@@ -323,7 +322,14 @@ function GraphCanvasInner({
           </marker>
         </defs>
 
-        <rect className="graph__bg" width="100%" height="100%" fill="transparent" />
+        {/* Background click catcher — only fires for canvas background, not nodes */}
+        <rect
+          className="graph__bg"
+          width="100%"
+          height="100%"
+          fill="transparent"
+          onClick={handleBgClick}
+        />
 
         <g
           className="graph__layer"
