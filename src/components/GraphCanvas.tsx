@@ -165,6 +165,10 @@ function GraphCanvasInner({
       const prev = activePointers.current.get(e.pointerId);
       if (!prev) return;
 
+      // Update pointer position BEFORE computing distance so both
+      // pointers reflect their latest positions for pinch-zoom.
+      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
       if (activePointers.current.size === 1 && panningRef.current) {
         setTransform((t) => ({
           ...t,
@@ -188,8 +192,6 @@ function GraphCanvasInner({
         });
         pinchDistRef.current = dist;
       }
-
-      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     };
 
     const onPointerUp = (e: PointerEvent) => {
