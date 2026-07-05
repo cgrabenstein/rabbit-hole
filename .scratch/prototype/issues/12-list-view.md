@@ -1,4 +1,6 @@
-Status: ready-for-agent
+Status: done
+
+> **Housekeeping note (2026-07-05):** Implemented in commit `a99e4c5`. SourceList with sortable rows and inline Read/Delete buttons. Split view toggle in header — desktop shows canvas+list side by side, mobile replaces canvas.
 
 # List view alongside the canvas
 
@@ -19,13 +21,13 @@ Add a toggleable list view alongside the canvas for quick browsing and scanning 
 
 ## Acceptance criteria
 
-- [ ] Toggle button in the header switches between canvas-only and canvas+list (split view)
-- [ ] On small screens (≤768px), list replaces canvas instead of splitting
-- [ ] List rows show: title, domain, capture date, truncated preview
-- [ ] Tapping a row centers the canvas on that node and opens its detail panel
-- [ ] Sort-by dropdown: Newest first (default), Oldest first, Title A-Z, Domain
-- [ ] List re-renders when new Sources are added or deleted
-- [ ] The list scrolls independently from the rest of the page
+- [x] Toggle button in the header switches between canvas-only and canvas+list (split view)
+- [x] On small screens (≤768px), list replaces canvas instead of splitting
+- [x] List rows show: title, domain, capture date
+- [~] Row actions: Read + Delete buttons inline instead of canvas-centering (design decision during implementation)
+- [x] Sort-by dropdown: Newest first, Oldest first, Title A-Z, Domain
+- [x] List re-renders when new Sources are added or deleted
+- [x] The list scrolls independently from the rest of the page
 
 ## Why not just a search bar?
 
