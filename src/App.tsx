@@ -4,6 +4,7 @@ import { GraphCanvas } from "./components/GraphCanvas";
 import { SourceDetail } from "./components/SourceDetail";
 import { ReadingView } from "./components/ReadingView";
 import { EmptyState } from "./components/EmptyState";
+import { SourceList } from "./components/SourceList";
 import { Toast, type ToastMessage } from "./components/Toast";
 import { useSources } from "./hooks/useSources";
 import { fetchTitle } from "./api/fetchTitle";
@@ -25,6 +26,7 @@ export default function App() {
   const [detailSource, setDetailSource] = useState<Source | null>(null);
   const [readingSourceId, setReadingSourceId] = useState<number | null>(null);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [showList, setShowList] = useState(false);
 
   // ── Fetch relationships ──
   useEffect(() => {
@@ -194,7 +196,18 @@ export default function App() {
         <header
           className={`app__header ${hasSources ? "app__header--compact" : ""}`}
         >
+          <div className="app__title-row">
           <h1 className="app__title">🐇 Rabbit Hole</h1>
+          {hasSources && (
+            <button
+              className="app__list-toggle"
+              onClick={() => setShowList((v) => !v)}
+              aria-label={showList ? "Hide list" : "Show list"}
+            >
+              {showList ? "🌐" : "📋"}
+            </button>
+          )}
+        </div>
           {!hasSources && (
             <p className="app__tagline">
               A visual map of everything you read and how ideas connect.
@@ -215,16 +228,27 @@ export default function App() {
 
         {/* ── graph area ── */}
         {hasSources ? (
-          <div className="app__graph-area">
-            <GraphCanvas
-              sources={sources}
-              relationships={relationships}
-              onRead={handleReadSource}
-              onDelete={handleDeleteSource}
-              onConnect={handleConnect}
-              onRemoveConnection={handleRemoveConnection}
-              onDetails={handleDetailsSource}
-            />
+          <div className={`app__graph-area ${showList ? "app__graph-area--split" : ""}`}>
+            <div className="app__canvas-wrapper">
+              <GraphCanvas
+                sources={sources}
+                relationships={relationships}
+                onRead={handleReadSource}
+                onDelete={handleDeleteSource}
+                onConnect={handleConnect}
+                onRemoveConnection={handleRemoveConnection}
+                onDetails={handleDetailsSource}
+              />
+            </div>
+            {showList && (
+              <div className="app__list-panel">
+                <SourceList
+                  sources={sources}
+                  onRead={handleReadSource}
+                  onDelete={handleDeleteSource}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <EmptyState />

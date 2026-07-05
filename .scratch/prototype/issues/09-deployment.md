@@ -1,4 +1,6 @@
-Status: ready-for-agent
+Status: done
+
+> **Housekeeping note (2026-07-05):** Implemented in commit `f8a4e6a`. Deployed to `rh.grabenstein.cloud` via Docker. Two AC items remain open: CI/CD auto-deploy and Lighthouse PWA audit.
 
 # Deployment
 
@@ -8,8 +10,8 @@ Deploy the PWA to a hosting provider that supports PWAs with service workers (e.
 
 ## Acceptance criteria
 
-- [ ] PWA is deployed to a public URL with HTTPS
-- [x] Service worker registers and works in production (tested on localhost)
+- [x] PWA is deployed to `rh.grabenstein.cloud` with HTTPS (confirmed working via PWA update test)
+- [x] Service worker registers and works in production
 - [x] PWA manifest loads correctly (tested on localhost)
 - [x] Web Share Target declared in manifest (needs HTTPS + real device to test)
 - [ ] Auto-deploy from main branch / CI/CD is configured (manual docker-compose flow for now)

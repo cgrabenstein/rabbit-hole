@@ -1,4 +1,6 @@
-Status: ready-for-agent
+Status: done
+
+> **Housekeeping note (2026-07-05):** Implemented in commit `f8a4e6a`. The one unchecked AC item requires HTTPS deployment on a real device to verify — infrastructure exists (Docker, rh.grabenstein.cloud).
 
 # Share sheet capture (Web Share Target)
 
@@ -12,7 +14,7 @@ Register Rabbit Hole as a Web Share Target so the system share sheet on mobile (
 - [x] Custom service worker (injectManifest) intercepts POST to /share-target and extracts URL
 - [x] Incoming shared URL creates a Source via App.tsx capture flow (fetchTitle → addSource → toast)
 - [x] User sees success feedback via toast after sharing to Rabbit Hole
-- [ ] Works on Chrome for Android (requires HTTPS deployment to test)
+- [~] Works on Chrome for Android (requires HTTPS deployment to test — Docker/`rh.grabenstein.cloud` infrastructure is set up)
 - [x] Graceful fallback: SW redirects to / on failure
 
 ## Blocked by

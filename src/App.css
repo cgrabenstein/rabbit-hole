@@ -36,6 +36,12 @@
   width: 100%;
 }
 
+.app__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .app__title {
   font-size: 28px;
   font-weight: 700;
@@ -45,6 +51,23 @@
 
 .app__header--compact .app__title {
   font-size: 20px;
+}
+
+/* ── list toggle button ── */
+.app__list-toggle {
+  background: none;
+  border: 1px solid #3a3a6a;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.app__list-toggle:hover {
+  background: #1e1e3a;
+  border-color: #6c63ff;
 }
 
 .app__tagline {
@@ -58,10 +81,50 @@
 .app__graph-area {
   flex: 1;
   width: 100%;
+  display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
   border-radius: 12px;
   contain: paint layout;
+}
+
+/* ── split view (canvas + list side by side) ── */
+.app__graph-area--split {
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+}
+
+.app__canvas-wrapper {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.app__list-panel {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid #2a2a4a;
+  overflow: hidden;
+}
+
+/* On mobile, list replaces canvas instead of splitting */
+@media (max-width: 768px) {
+  .app__graph-area--split {
+    flex-direction: column;
+  }
+
+  .app__graph-area--split .app__canvas-wrapper {
+    display: none;
+  }
+
+  .app__list-panel {
+    width: 100%;
+    flex: 1;
+    border-left: none;
+  }
 }
 
 /* ── capture ── */

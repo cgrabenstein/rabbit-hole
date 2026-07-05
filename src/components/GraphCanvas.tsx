@@ -12,6 +12,8 @@ interface GraphCanvasProps {
   onConnect: (sourceA: Source, sourceB: Source) => void;
   onRemoveConnection: (relationshipId: number) => void;
   onDetails?: (source: Source) => void;
+  /** When set, the canvas pans/zooms to center on this node and opens its popover */
+  focusNodeId?: number | null;
 }
 
 interface ViewTransform {
@@ -73,6 +75,7 @@ function GraphCanvasInner({
   onConnect,
   onRemoveConnection,
   onDetails,
+  focusNodeId,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -98,6 +101,26 @@ function GraphCanvasInner({
   // ── selection / linking state ──
   const [selectedSource, setSelectedSource] = useState<Source | null>(null);
   const [linkingSource, setLinkingSource] = useState<Source | null>(null);
+
+  // ── focus node (from external — list view click) ──
+  const focusedRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusNodeId == null || focusNodeId === focusedRef.current) return;
+    focusedRef.current = focusNodeId;
+
+    const node = nodes.find((n) => n.id === focusNodeId);
+    if (!node || node.x == null || node.y == null) return;
+
+    const { width, height } = dimensions;
+    const scale = Math.min(2, Math.max(0.5, transform.scale));
+    const newX = width / 2 - node.x * scale;
+    const newY = height / 2 - node.y * scale;
+
+    setTransform({ x: newX, y: newY, scale });
+
+    const source = sources.find((s) => s.id === focusNodeId);
+    if (source) setSelectedSource(source);
+  }, [focusNodeId, nodes, dimensions, sources]);
 
   // Find node index for a source ID
   const getNode = useCallback(

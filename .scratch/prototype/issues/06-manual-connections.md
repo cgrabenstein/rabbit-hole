@@ -1,4 +1,6 @@
-Status: ready-for-agent
+Status: done
+
+> **Housekeeping note (2026-07-05):** Implemented in commit `653bc71` with subsequent fixes (`e9a9975`, `f89b21d`). One AC item partially open: auto-layout attractive force between connected nodes (needs d3 force link distance tuning).
 
 # Manual connections
 
@@ -22,14 +24,14 @@ Allow the user to create a directed Connection between two Sources on the canvas
 
 ## Acceptance criteria
 
-- [ ] "Connect" button in SourceDetail panel enters connect mode
-- [ ] Source in connect mode has a visual indicator (pulsing border / bright fill)
-- [ ] Tapping a second source creates a directed Relationship and renders it as an arrow
-- [ ] Auto-layout adjusts to keep connected sources nearby (attractive force in simulation)
-- [ ] Connection can be removed (from detail panel of either endpoint)
-- [ ] Tapping canvas background or the originating node cancels connect mode
-- [ ] Multiple connections from a single source are supported
-- [ ] Existing relationships render as arrows on canvas load
+- [x] "Link" button in NodePopover enters linking mode (connect mode)
+- [x] Source in linking mode has visual indicator (`graph__card--linking` CSS class)
+- [x] Tapping a second source creates a directed Relationship and renders it as arrow
+- [~] Auto-layout adjusts to keep connected sources nearby (attractive force in simulation — needs d3 force tuning)
+- [x] Connection can be removed (via NodePopover "Connected" list remove button)
+- [x] Tapping canvas background or the originating node cancels linking mode
+- [x] Multiple connections from a single source are supported
+- [x] Existing relationships render as arrows on canvas load
 
 ## Blocked by
 

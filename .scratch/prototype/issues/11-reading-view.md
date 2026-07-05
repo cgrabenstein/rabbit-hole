@@ -1,4 +1,6 @@
-Status: ready-for-agent
+Status: done
+
+> **Housekeeping note (2026-07-05):** Implemented in commit `bf2585e`. All acceptance criteria met. The one unchecked item (offline reading) was explicitly deferred as a future concern.
 
 # Reading view with in-app readability
 

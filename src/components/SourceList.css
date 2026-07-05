@@ -1,0 +1,159 @@
+.source-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #16162e;
+  border-left: 1px solid #2a2a4a;
+  min-width: 0;
+}
+
+/* ── header ── */
+.source-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #2a2a4a;
+  flex-shrink: 0;
+}
+
+.source-list__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #c0c0e0;
+  margin: 0;
+}
+
+.source-list__sort {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3a6a;
+  background: #1e1e3a;
+  color: #b0b0d0;
+  cursor: pointer;
+  outline: none;
+}
+
+.source-list__sort:focus {
+  border-color: #6c63ff;
+}
+
+/* ── scrollable body ── */
+.source-list__body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.source-list__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.source-list__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.source-list__body::-webkit-scrollbar-thumb {
+  background: #3a3a6a;
+  border-radius: 3px;
+}
+
+/* ── empty state ── */
+.source-list__empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #666;
+  font-size: 13px;
+}
+
+/* ── row ── */
+.source-list__row {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-bottom: 1px solid #1e1e3a;
+  gap: 8px;
+}
+
+.source-list__row:hover {
+  background: #1e1e3a;
+}
+
+.source-list__row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.source-list__row-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0f0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.source-list__row-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #777;
+}
+
+.source-list__row-domain {
+  color: #6c63ff;
+}
+
+.source-list__row-sep {
+  color: #444;
+}
+
+.source-list__row-date {
+  color: #666;
+}
+
+/* ── action buttons ── */
+.source-list__row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.source-list__btn {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #3a3a6a;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  white-space: nowrap;
+}
+
+.source-list__btn--read {
+  background: #1e1e3a;
+  color: #6c63ff;
+  border-color: #3a3a6a;
+}
+
+.source-list__btn--read:hover {
+  background: #2a2a5a;
+  border-color: #6c63ff;
+}
+
+.source-list__btn--delete {
+  background: transparent;
+  color: #a55;
+  border-color: #3a2a2a;
+}
+
+.source-list__btn--delete:hover {
+  background: #2a1a1a;
+  border-color: #a55;
+}
