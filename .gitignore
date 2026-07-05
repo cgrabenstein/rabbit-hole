@@ -5,3 +5,4 @@ dist/
 *.local
 *.tsbuildinfo
 .deploy.env
+docker-compose.prod.yml
