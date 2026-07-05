@@ -1,6 +1,9 @@
 services:
   rabbit-hole:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_COMMIT_HASH: ${VITE_COMMIT_HASH:-dev}
     container_name: rabbit-hole
     ports:
       - "3000:3000"

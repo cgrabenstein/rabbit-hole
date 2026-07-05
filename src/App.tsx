@@ -207,6 +207,9 @@ export default function App() {
               {showList ? "🌐" : "📋"}
             </button>
           )}
+          <span className="app__commit-hash">
+            {import.meta.env.VITE_COMMIT_HASH || "dev"}
+          </span>
         </div>
           {!hasSources && (
             <p className="app__tagline">

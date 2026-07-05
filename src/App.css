@@ -70,6 +70,19 @@
   border-color: #6c63ff;
 }
 
+.app__commit-hash {
+  margin-left: auto;
+  font-size: 11px;
+  font-family: monospace;
+  color: #555;
+  background: #1a1a2e;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #2a2a4a;
+  line-height: 1.4;
+  user-select: all;
+}
+
 .app__tagline {
   font-size: 14px;
   color: #888;

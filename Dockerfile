@@ -1,5 +1,8 @@
 # ── Build stage ──
 FROM node:22-alpine AS build
+ARG VITE_COMMIT_HASH=dev
+ENV VITE_COMMIT_HASH=$VITE_COMMIT_HASH
+
 WORKDIR /app
 
 # Install deps first (leverages Docker layer caching)

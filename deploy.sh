@@ -43,7 +43,7 @@ ssh "$DEPLOY_HOST" <<-REMOTE
   git pull
 
   echo "  🔨 Rebuilding Docker image..."
-  docker compose build
+  VITE_COMMIT_HASH=\$(git rev-parse --short HEAD) docker compose build
 
   echo "  🔄 Restarting container..."
   docker compose up -d
