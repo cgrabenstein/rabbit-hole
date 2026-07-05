@@ -35,27 +35,33 @@ set -u
 
 echo "🚀 Deploying rabbit-hole to $DEPLOY_HOST:$DEPLOY_PATH ..."
 
-ssh "$DEPLOY_HOST" <<-REMOTE
-  set -euo pipefail
-  cd "$DEPLOY_PATH"
+# Build the remote script as a local variable, then pipe it to SSH.
+# This avoids heredoc escaping headaches with remote variables.
+REMOTE_SCRIPT=$(cat <<SCRIPT
+set -euo pipefail
+cd "$DEPLOY_PATH"
 
-  # Build compose file list — include prod override if it exists on this server
-  COMPOSE_FILES="-f docker-compose.yml"
-  if [ -f docker-compose.prod.yml ]; then
-    COMPOSE_FILES="\$COMPOSE_FILES -f docker-compose.prod.yml"
-  fi
+PROD_FILE=""
+if [ -f docker-compose.prod.yml ]; then
+  PROD_FILE="-f docker-compose.prod.yml"
+fi
 
-  echo "  📥 Pulling latest code..."
-  git pull
+echo "  📥 Pulling latest code..."
+git pull
 
-  echo "  🔨 Rebuilding Docker image..."
-  VITE_COMMIT_HASH=\$(git rev-parse --short HEAD) docker compose \$COMPOSE_FILES build
+echo "  🔨 Rebuilding Docker image..."
+VITE_COMMIT_HASH=\$(git rev-parse --short HEAD) docker compose -f docker-compose.yml \$PROD_FILE build
 
-  echo "  🔄 Restarting container..."
-  docker compose \$COMPOSE_FILES up -d
+echo "  🔄 Restarting container..."
+docker compose -f docker-compose.yml \$PROD_FILE up -d
 
-  echo "  🧹 Cleaning up old images..."
-  docker image prune -f
+echo "  🧹 Cleaning up old images..."
+docker image prune -f
 
-  echo "✅ Done — rabbit-hole is running"
+echo "✅ Done — rabbit-hole is running"
+SCRIPT
+)
+
+ssh "$DEPLOY_HOST" bash -s <<REMOTE
+$REMOTE_SCRIPT
 REMOTE
