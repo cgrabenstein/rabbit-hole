@@ -193,3 +193,70 @@
   width: 100%;
   max-width: 480px;
 }
+
+/* ── OPDS info ── */
+.app__opds-info {
+  position: relative;
+  margin-left: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.app__opds-info summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.app__opds-info summary:hover {
+  background: #1e1e3a;
+}
+
+.app__opds-info summary::-webkit-details-marker {
+  display: none;
+}
+
+.app__opds-info-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  width: 340px;
+  margin-top: 4px;
+  padding: 12px;
+  background: #1a1a2e;
+  border: 1px solid #3a3a6a;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  white-space: normal;
+  cursor: auto;
+}
+
+.app__opds-label {
+  font-size: 11px;
+  color: #888;
+  margin: 0 0 6px;
+}
+
+.app__opds-url {
+  display: block;
+  font-size: 12px;
+  font-family: monospace;
+  color: #6c63ff;
+  background: #0d0d1a;
+  padding: 8px;
+  border-radius: 4px;
+  word-break: break-all;
+  user-select: all;
+  line-height: 1.5;
+}
+
+.app__opds-hint {
+  font-size: 11px;
+  color: #666;
+  margin: 6px 0 0;
+}

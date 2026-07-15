@@ -8,6 +8,7 @@ import { SourceList } from "./components/SourceList";
 import { Toast, type ToastMessage } from "./components/Toast";
 import { useSources } from "./hooks/useSources";
 import { fetchTitle } from "./api/fetchTitle";
+import { getClientId } from "./lib/clientId";
 import {
   addSource,
   deleteSource,
@@ -210,6 +211,16 @@ export default function App() {
           <span className="app__commit-hash">
             {import.meta.env.VITE_COMMIT_HASH || "dev"}
           </span>
+          <details className="app__opds-info">
+            <summary title="OPDS feed for e-reader">📡</summary>
+            <div className="app__opds-info-panel">
+              <p className="app__opds-label">OPDS feed URL (paste into your e-reader):</p>
+              <code className="app__opds-url">
+                {window.location.origin}/opds/{getClientId()}/articles
+              </code>
+              <p className="app__opds-hint">Articles appear here after you read them in-app.</p>
+            </div>
+          </details>
         </div>
           {!hasSources && (
             <p className="app__tagline">

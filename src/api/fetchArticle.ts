@@ -1,3 +1,5 @@
+import { getClientId } from "../lib/clientId";
+
 export interface ReadResult {
   content: string;
   title: string;
@@ -10,6 +12,7 @@ export async function fetchArticle(url: string): Promise<ReadResult> {
   const params = new URLSearchParams({ url });
   const response = await fetch(`/api/read?${params}`, {
     signal: AbortSignal.timeout(15_000),
+    headers: { "X-Client-Id": getClientId() },
   });
 
   if (!response.ok) {

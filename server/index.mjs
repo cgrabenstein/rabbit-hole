@@ -1,8 +1,7 @@
 // @ts-check
 // ── Production Node.js server ──
-// Serves the built PWA static files and API endpoints (fetch-title, read).
-// Run with: node server/index.mjs
-// Expects dist/ to exist (from `npm run build`).
+// Serves the built PWA static files, API endpoints (fetch-title, read),
+// and an OPDS 1.2 feed of cached article content for e-reader access.
 
 import { createServer } from "node:http";
 import { readFileSync, statSync, existsSync } from "node:fs";
@@ -10,6 +9,7 @@ import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
+import { initDB, upsertArticle, getArticles, getArticleById } from "./db.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, "..", "dist");
@@ -57,6 +57,32 @@ function param(rawUrl, name) {
   }
 }
 
+/**
+ * Read X-Client-Id header or return null.
+ * @param {import("node:http").IncomingMessage} req
+ * @returns {string | null}
+ */
+function clientId(req) {
+  const id = req.headers["x-client-id"];
+  if (Array.isArray(id)) return id[0] ?? null;
+  return id ?? null;
+}
+
+// ── XML escaping ──
+
+/**
+ * @param {string} s
+ * @returns {string}
+ */
+function xmlEsc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 // ── extraction helpers (same logic as vite.config.ts) ──
 
 /**
@@ -64,8 +90,7 @@ function param(rawUrl, name) {
  * @returns {string | null}
  */
 function findAuthorInJSONLD(html) {
-  const blockRe =
-    /<script\s+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
+  const blockRe = /<script\s+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
   let m;
   while ((m = blockRe.exec(html)) !== null) {
     try {
@@ -171,6 +196,118 @@ function extractPublicationDate(html) {
   return null;
 }
 
+// ── OPDS helpers ──
+
+/**
+ * Wrap article content HTML in a minimal document for e-reader display.
+ * @param {string} title
+ * @param {string} bodyHtml
+ * @returns {string}
+ */
+function wrapContentHtml(title, bodyHtml) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${xmlEsc(title)}</title>
+<style>
+  body { font-family: serif; line-height: 1.6; max-width: 40em; margin: 0 auto; padding: 1em; color: #111; background: #fff; }
+  img { max-width: 100%; height: auto; }
+  pre { overflow-x: auto; }
+  a { color: #2563eb; }
+</style>
+</head>
+<body>
+${bodyHtml}
+</body>
+</html>`;
+}
+
+/**
+ * Format an ISO date string for Atom (RFC 3339).
+ * @param {string} iso
+ * @returns {string}
+ */
+function atomDate(iso) {
+  try {
+    return new Date(iso).toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
+/**
+ * Build the OPDS root navigation catalog.
+ * @param {string} cId
+ * @param {number} articleCount
+ * @param {string} host
+ * @returns {string}
+ */
+function opdsRootXml(cId, articleCount, host) {
+  const updated = new Date().toISOString();
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
+  <id>rabbit-hole:${xmlEsc(cId)}</id>
+  <title>Rabbit Hole</title>
+  <updated>${updated}</updated>
+  <author><name>Rabbit Hole</name></author>
+  <link rel="self" href="/opds/${xmlEsc(cId)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+  <link rel="start" href="/opds/${xmlEsc(cId)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+  <entry>
+    <title>Articles (${articleCount})</title>
+    <id>rabbit-hole:${xmlEsc(cId)}:articles</id>
+    <updated>${updated}</updated>
+    <content type="text">All saved articles with readable content.</content>
+    <link rel="http://opds-spec.org/subsection" href="/opds/${xmlEsc(cId)}/articles" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+  </entry>
+</feed>`;
+}
+
+/**
+ * Build the OPDS acquisition feed of all articles for a client.
+ * @param {string} cId
+ * @param {Array<any>} articles
+ * @param {string} host
+ * @returns {string}
+ */
+function opdsArticlesXml(cId, articles, host) {
+  const updated = new Date().toISOString();
+  const entries = articles
+    .map((a) => {
+      const pubDate = atomDate(a.publication_date || a.created_at || updated);
+      const hasContent = !!a.content;
+      const contentLink = hasContent
+        ? `    <link rel="http://opds-spec.org/acquisition" href="/api/article-content/${xmlEsc(cId)}/${a.id}" type="text/html"/>`
+        : "";
+      return `  <entry>
+    <title>${xmlEsc(a.title || "Untitled")}</title>
+    <id>rabbit-hole:source:${xmlEsc(cId)}:${a.id}</id>
+    ${a.author ? `    <author><name>${xmlEsc(a.author)}</name></author>` : ""}
+    <published>${pubDate}</published>
+    <updated>${pubDate}</updated>
+    <dc:identifier xmlns:dc="http://purl.org/dc/terms/">${xmlEsc(a.url)}</dc:identifier>
+    <link rel="alternate" href="${xmlEsc(a.url)}" type="text/html"/>
+    ${a.domain ? `    <dc:publisher xmlns:dc="http://purl.org/dc/terms/">${xmlEsc(a.domain)}</dc:publisher>` : ""}
+${contentLink}
+  </entry>`;
+    })
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:opds="http://opds-spec.org/2010/catalog"
+      xmlns:dc="http://purl.org/dc/terms/">
+  <id>rabbit-hole:${xmlEsc(cId)}:articles</id>
+  <title>Rabbit Hole — All Articles</title>
+  <updated>${updated}</updated>
+  <author><name>Rabbit Hole</name></author>
+  <link rel="self" href="/opds/${xmlEsc(cId)}/articles" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+  <link rel="start" href="/opds/${xmlEsc(cId)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+${entries}
+</feed>`;
+}
+
 // ── request handler ──
 
 const server = createServer(async (req, res) => {
@@ -189,6 +326,15 @@ const server = createServer(async (req, res) => {
       const html = await response.text();
       const match = html.match(/<title[^>]*>([^<]+?)<\/title>/i);
       const title = match ? match[1].trim() : new URL(urlStr).hostname;
+
+      // Cache in DB for OPDS
+      const cId = clientId(req);
+      if (cId) {
+        upsertArticle(cId, urlStr, {
+          title,
+          created_at: new Date().toISOString(),
+        });
+      }
 
       return send(res, 200, { title });
     }
@@ -225,6 +371,19 @@ const server = createServer(async (req, res) => {
         extractPublicationDate(html) ||
         null;
 
+      // Cache in DB for OPDS
+      const cId = clientId(req);
+      if (cId) {
+        upsertArticle(cId, urlStr, {
+          title: article.title,
+          content: article.content,
+          author,
+          publication_date: publicationDate,
+          domain,
+          read_at: new Date().toISOString(),
+        });
+      }
+
       return send(res, 200, {
         content: article.content,
         title: article.title,
@@ -232,6 +391,40 @@ const server = createServer(async (req, res) => {
         publicationDate,
         domain,
       });
+    }
+
+    // ── OPDS: root catalog ──
+    // GET /opds/:clientId
+    const opdsMatch = pathname.match(/^\/opds\/([^/]+)$/);
+    if (opdsMatch) {
+      const cId = decodeURIComponent(opdsMatch[1]);
+      const articles = getArticles(cId);
+      const xml = opdsRootXml(cId, articles.length, req.headers.host || `localhost:${PORT}`);
+      return send(res, 200, xml, "application/atom+xml;profile=opds-catalog;kind=navigation");
+    }
+
+    // ── OPDS: article acquisition feed ──
+    // GET /opds/:clientId/articles
+    const opdsArticlesMatch = pathname.match(/^\/opds\/([^/]+)\/articles$/);
+    if (opdsArticlesMatch) {
+      const cId = decodeURIComponent(opdsArticlesMatch[1]);
+      const articles = getArticles(cId);
+      const xml = opdsArticlesXml(cId, articles, req.headers.host || `localhost:${PORT}`);
+      return send(res, 200, xml, "application/atom+xml;profile=opds-catalog;kind=acquisition");
+    }
+
+    // ── API: article content (HTML for e-reader) ──
+    // GET /api/article-content/:clientId/:articleId
+    const contentMatch = pathname.match(/^\/api\/article-content\/([^/]+)\/(\d+)$/);
+    if (contentMatch) {
+      const cId = decodeURIComponent(contentMatch[1]);
+      const aId = parseInt(contentMatch[2], 10);
+      const article = getArticleById(cId, aId);
+      if (!article || !article.content) {
+        return send(res, 404, "Article not found", "text/plain");
+      }
+      const html = wrapContentHtml(article.title || "Untitled", article.content);
+      return send(res, 200, html, "text/html; charset=utf-8");
     }
 
     // ── Static files (SPA) ──
@@ -250,6 +443,15 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`🐇 Rabbit Hole server running on http://localhost:${PORT}`);
-});
+// ── start ──
+
+initDB()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`🐇 Rabbit Hole server running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to initialize database:", err);
+    process.exit(1);
+  });
