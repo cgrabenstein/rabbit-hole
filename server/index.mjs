@@ -4,12 +4,14 @@
 // and an OPDS 1.2 feed of cached article content for e-reader access.
 
 import { createServer } from "node:http";
+import crypto from "node:crypto";
 import { readFileSync, statSync, existsSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
 import { initDB, upsertArticle, getArticles, getArticleById } from "./db.mjs";
+import archiver from "archiver";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, "..", "dist");
@@ -238,6 +240,116 @@ function atomDate(iso) {
 }
 
 /**
+ * Sanitize a string for use as a filename.
+ * @param {string} s
+ * @returns {string}
+ */
+function sanitizeFilename(s) {
+  return String(s)
+    .replace(/[<>:"\\/|?*]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80) || "article";
+}
+
+/**
+ * Stream a minimal EPUB (EPUB 2) for an article to the response.
+ * @param {import("node:http").ServerResponse} res
+ * @param {{title:string;author:string|null;content:string;url:string}} article
+ */
+function sendEpub(res, article) {
+  const title = article.title || "Untitled";
+  const author = article.author || "";
+  const contentHtml = article.content || "";
+  const filename = sanitizeFilename(title) + ".epub";
+
+  // Build unique identifier
+  const uuid = `urn:uuid:${crypto.randomUUID()}`;
+
+  // XHTML content — wrap the Readability HTML in a valid XHTML document
+  const xhtml = `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8"/>
+<title>${xmlEsc(title)}</title>
+<style>
+  body { font-family: serif; line-height: 1.6; max-width: 40em; margin: 0 auto; padding: 1em; }
+  img { max-width: 100%; height: auto; }
+  pre { overflow-x: auto; white-space: pre-wrap; }
+  a { color: #2563eb; }
+</style>
+</head>
+<body>
+${contentHtml}
+</body>
+</html>`;
+
+  // Content OPF
+  const opf = `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="BookId">
+  <metadata>
+    <dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">${xmlEsc(title)}</dc:title>
+    ${author ? `<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">${xmlEsc(author)}</dc:creator>` : ""}
+    <dc:identifier xmlns:dc="http://purl.org/dc/elements/1.1/" id="BookId">${xmlEsc(uuid)}</dc:identifier>
+    <dc:language xmlns:dc="http://purl.org/dc/elements/1.1/">en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="content"/>
+  </spine>
+</package>`;
+
+  // NCX (table of contents)
+  const ncx = `<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head>
+    <meta name="dtb:uid" content="${xmlEsc(uuid)}"/>
+    <meta name="dtb:depth" content="1"/>
+    <meta name="dtb:totalPageCount" content="0"/>
+    <meta name="dtb:maxPageNumber" content="0"/>
+  </head>
+  <docTitle><text>${xmlEsc(title)}</text></docTitle>
+  <navMap>
+    <navPoint id="navpoint-1" playOrder="1">
+      <navLabel><text>${xmlEsc(title)}</text></navLabel>
+      <content src="content.xhtml"/>
+    </navPoint>
+  </navMap>
+</ncx>`;
+
+  // Container XML
+  const container = `<?xml version="1.0" encoding="utf-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`;
+
+  // Build EPUB (ZIP) archive
+  const archive = archiver("zip", { zlib: { level: 9 } });
+
+  res.writeHead(200, {
+    "Content-Type": "application/epub+zip",
+    "Content-Disposition": `attachment; filename="${filename}"`,
+  });
+
+  archive.pipe(res);
+
+  // mimetype MUST be first, stored uncompressed
+  archive.append("application/epub+zip", { name: "mimetype", store: true });
+  archive.append(container, { name: "META-INF/container.xml" });
+  archive.append(opf, { name: "OEBPS/content.opf" });
+  archive.append(ncx, { name: "OEBPS/toc.ncx" });
+  archive.append(xhtml, { name: "OEBPS/content.xhtml" });
+
+  archive.finalize();
+}
+
+/**
  * Build the OPDS root navigation catalog.
  * @param {string} cId
  * @param {number} articleCount
@@ -413,7 +525,7 @@ const server = createServer(async (req, res) => {
       return send(res, 200, xml, "application/atom+xml; charset=utf-8");
     }
 
-    // ── API: article content (HTML for e-reader) ──
+    // ── API: article content (EPUB download for e-reader) ──
     // GET /api/article-content/:clientId/:articleId
     const contentMatch = pathname.match(/^\/api\/article-content\/([^/]+)\/(\d+)$/);
     if (contentMatch) {
@@ -423,8 +535,9 @@ const server = createServer(async (req, res) => {
       if (!article || !article.content) {
         return send(res, 404, "Article not found", "text/plain");
       }
-      const html = wrapContentHtml(article.title || "Untitled", article.content);
-      return send(res, 200, html, "text/html; charset=utf-8");
+
+      await sendEpub(res, article);
+      return;
     }
 
     // ── Static files (SPA) ──

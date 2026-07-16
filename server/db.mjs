@@ -102,7 +102,6 @@ export function getArticles(clientId) {
   const result = db.exec(
     `SELECT id, url, title, author, publication_date, domain, content, created_at, read_at
      FROM articles
-     WHERE client_id = '${clientId.replace(/'/g, "''")}'
      ORDER BY COALESCE(read_at, created_at) DESC`
   );
   if (result.length === 0) return [];
@@ -128,7 +127,7 @@ export function getArticleById(clientId, articleId) {
   const result = db.exec(
     `SELECT id, url, title, author, publication_date, domain, content, created_at, read_at
      FROM articles
-     WHERE id = ${articleId} AND client_id = '${clientId.replace(/'/g, "''")}'`
+     WHERE id = ${articleId}`
   );
   if (result.length === 0 || result[0].values.length === 0) return null;
   const { columns, values } = result[0];
