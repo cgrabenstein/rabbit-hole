@@ -252,14 +252,14 @@ function opdsRootXml(cId, articleCount, host) {
   <title>Rabbit Hole</title>
   <updated>${updated}</updated>
   <author><name>Rabbit Hole</name></author>
-  <link rel="self" href="/opds/${xmlEsc(cId)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-  <link rel="start" href="/opds/${xmlEsc(cId)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+  <link rel="self" href="/opds/${xmlEsc(cId)}" type="application/atom+xml"/>
+  <link rel="start" href="/opds/${xmlEsc(cId)}" type="application/atom+xml"/>
   <entry>
     <title>Articles (${articleCount})</title>
     <id>rabbit-hole:${xmlEsc(cId)}:articles</id>
     <updated>${updated}</updated>
     <content type="text">All saved articles with readable content.</content>
-    <link rel="http://opds-spec.org/subsection" href="/opds/${xmlEsc(cId)}/articles" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    <link rel="http://opds-spec.org/subsection" href="/opds/${xmlEsc(cId)}/articles" type="application/atom+xml"/>
   </entry>
 </feed>`;
 }
@@ -278,7 +278,7 @@ function opdsArticlesXml(cId, articles, host) {
       const pubDate = atomDate(a.publication_date || a.created_at || updated);
       const hasContent = !!a.content;
       const contentLink = hasContent
-        ? `    <link rel="http://opds-spec.org/acquisition" href="/api/article-content/${xmlEsc(cId)}/${a.id}" type="text/html"/>`
+        ? `    <link rel="http://opds-spec.org/acquisition" href="/api/article-content/${xmlEsc(cId)}/${a.id}" type="application/epub+zip"/>`
         : "";
       return `  <entry>
     <title>${xmlEsc(a.title || "Untitled")}</title>
@@ -302,8 +302,8 @@ ${contentLink}
   <title>Rabbit Hole — All Articles</title>
   <updated>${updated}</updated>
   <author><name>Rabbit Hole</name></author>
-  <link rel="self" href="/opds/${xmlEsc(cId)}/articles" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
-  <link rel="start" href="/opds/${xmlEsc(cId)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+  <link rel="self" href="/opds/${xmlEsc(cId)}/articles" type="application/atom+xml"/>
+  <link rel="start" href="/opds/${xmlEsc(cId)}" type="application/atom+xml"/>
 ${entries}
 </feed>`;
 }
@@ -400,7 +400,7 @@ const server = createServer(async (req, res) => {
       const cId = decodeURIComponent(opdsMatch[1]);
       const articles = getArticles(cId);
       const xml = opdsRootXml(cId, articles.length, req.headers.host || `localhost:${PORT}`);
-      return send(res, 200, xml, "application/atom+xml;profile=opds-catalog;kind=navigation");
+      return send(res, 200, xml, "application/atom+xml; charset=utf-8");
     }
 
     // ── OPDS: article acquisition feed ──
@@ -410,7 +410,7 @@ const server = createServer(async (req, res) => {
       const cId = decodeURIComponent(opdsArticlesMatch[1]);
       const articles = getArticles(cId);
       const xml = opdsArticlesXml(cId, articles, req.headers.host || `localhost:${PORT}`);
-      return send(res, 200, xml, "application/atom+xml;profile=opds-catalog;kind=acquisition");
+      return send(res, 200, xml, "application/atom+xml; charset=utf-8");
     }
 
     // ── API: article content (HTML for e-reader) ──
