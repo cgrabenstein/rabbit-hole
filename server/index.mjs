@@ -289,35 +289,10 @@ async function sendEpub(res, article) {
   // Build unique identifier
   const uuid = `urn:uuid:${crypto.randomUUID()}`;
 
-  // ── Step 1: Download images and map URLs to local EPUB paths ──
-  /** @type {Map<string, {data:Buffer,path:string}>} */
-  const imageMap = new Map();
-  const imgSrcs = [...contentHtml.matchAll(/<img[^>]+src="([^"]*)"/gi)].map(m => m[1]);
-  await Promise.allSettled(
-    [...new Set(imgSrcs)].map(async (url, i) => {
-      if (!url.startsWith("http://") && !url.startsWith("https://")) return;
-      const extMatch = url.match(/\.(jpe?g|png)(\?|$)/i);
-      const ext = extMatch ? extMatch[1].toLowerCase().replace("jpeg", "jpg") : "jpg";
-      try {
-        const resp = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-        if (!resp.ok) return;
-        const buf = Buffer.from(await resp.arrayBuffer());
-        if (buf.length === 0 || buf.length > 10_000_000) return; // skip empty or >10MB
-        const localPath = `images/img_${i}.${ext}`;
-        imageMap.set(url, { data: buf, path: localPath });
-      } catch { /* image download is best-effort */ }
-    })
-  );
-
-  // ── Step 2: Rewrite img src to local paths in HTML ──
-  let processedHtml = contentHtml;
-  for (const [url, img] of imageMap) {
-    processedHtml = processedHtml.replaceAll(url, img.path);
-  }
-
-  // ── Step 3: Strip tags to safe allowlist ──
+  // Strip HTML to safe allowlist — Crosspoint's slim parser only handles
+  // text blocks (paragraphs, links, lists) and chokes on img/media tags.
   const ALLOWED_TAGS = new Set([
-    "img", "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
+    "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
     "h1", "h2", "h3", "h4", "h5", "h6", "div", "br", "hr",
     "em", "strong", "i", "b", "pre", "code", "q",
     "dl", "dt", "dd",
@@ -327,18 +302,14 @@ async function sendEpub(res, article) {
   function stripAttrs(tag) {
     const name = tag.replace(/^<\/?/, "").replace(/[\s\/>].*$/, "").toLowerCase();
     if (!ALLOWED_TAGS.has(name)) return "";
-    if (name === "img") {
-      const src = tag.match(/\ssrc="([^"]*)"/i);
-      return src ? `<img src="${src[1]}">` : "<img>";
-    }
     return "<" + (tag[1] === "/" ? "/" : "") + name + ">";
   }
-  const strippedHtml = processedHtml
+  const strippedHtml = contentHtml
     .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>/g, stripAttrs)
     .replace(/\n\s*\n/g, "\n");
 
-  // Remove img tags whose src wasn't downloaded (external URL still there)
-  const finalHtml = strippedHtml.replace(/<img\s+src="https?:[^"]*">/gi, "")
+  // Remove any remaining img tags that slipped through
+  const finalHtml = strippedHtml.replace(/<img\s*>/gi, "");
 
   const xhtml = `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
@@ -358,16 +329,11 @@ ${finalHtml}
 </body>
 </html>`;
 
-  // Build manifest items — content + ncx + each image
+  // Build manifest
   const manifestItems = [
     `    <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>`,
     `    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
   ];
-  let imgIdx = 0;
-  for (const [, img] of imageMap) {
-    const ext = img.path.split(".").pop();
-    manifestItems.push(`    <item id="img_${imgIdx++}" href="${img.path}" media-type="image/${ext === "png" ? "png" : "jpeg"}"/>`);
-  }
 
   // Content OPF
   const opf = `<?xml version="1.0" encoding="utf-8"?>
@@ -429,11 +395,6 @@ ${manifestItems.join("\n")}
   archive.append(opf, { name: "OEBPS/content.opf", store: true });
   archive.append(ncx, { name: "OEBPS/toc.ncx", store: true });
   archive.append(xhtml, { name: "OEBPS/content.xhtml", store: true });
-
-  // Add downloaded images
-  for (const [, img] of imageMap) {
-    archive.append(img.data, { name: `OEBPS/${img.path}`, store: true });
-  }
 
   archive.finalize();
 }
