@@ -280,7 +280,7 @@ function simplifyHtml(html) {
  * @param {import("node:http").ServerResponse} res
  * @param {{title:string;author:string|null;content:string;url:string}} article
  */
-function sendEpub(res, article) {
+async function sendEpub(res, article) {
   const title = article.title || "Untitled";
   const author = article.author || "";
   const contentHtml = simplifyHtml(article.content || "");
@@ -289,8 +289,33 @@ function sendEpub(res, article) {
   // Build unique identifier
   const uuid = `urn:uuid:${crypto.randomUUID()}`;
 
-  // Only keep HTML tags from a safe allowlist; strip everything else.
-  // This prevents unknown video/media/embed tags from crashing slim parsers.
+  // ── Step 1: Download images and map URLs to local EPUB paths ──
+  /** @type {Map<string, {data:Buffer,path:string}>} */
+  const imageMap = new Map();
+  const imgSrcs = [...contentHtml.matchAll(/<img[^>]+src="([^"]*)"/gi)].map(m => m[1]);
+  await Promise.allSettled(
+    [...new Set(imgSrcs)].map(async (url, i) => {
+      if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+      const extMatch = url.match(/\.(jpe?g|png)(\?|$)/i);
+      const ext = extMatch ? extMatch[1].toLowerCase().replace("jpeg", "jpg") : "jpg";
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+        if (!resp.ok) return;
+        const buf = Buffer.from(await resp.arrayBuffer());
+        if (buf.length === 0 || buf.length > 10_000_000) return; // skip empty or >10MB
+        const localPath = `images/img_${i}.${ext}`;
+        imageMap.set(url, { data: buf, path: localPath });
+      } catch { /* image download is best-effort */ }
+    })
+  );
+
+  // ── Step 2: Rewrite img src to local paths in HTML ──
+  let processedHtml = contentHtml;
+  for (const [url, img] of imageMap) {
+    processedHtml = processedHtml.replaceAll(url, img.path);
+  }
+
+  // ── Step 3: Strip tags to safe allowlist ──
   const ALLOWED_TAGS = new Set([
     "img", "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
     "h1", "h2", "h3", "h4", "h5", "h6", "div", "br", "hr",
@@ -299,21 +324,21 @@ function sendEpub(res, article) {
     "table", "tr", "td", "th", "caption",
     "s", "u", "small", "ins", "del", "mark"
   ]);
-  /** @param {string} tag */
   function stripAttrs(tag) {
     const name = tag.replace(/^<\/?/, "").replace(/[\s\/>].*$/, "").toLowerCase();
     if (!ALLOWED_TAGS.has(name)) return "";
     if (name === "img") {
-      // Keep src on img so the reader's IMAGE_BLOCK can resolve it
       const src = tag.match(/\ssrc="([^"]*)"/i);
       return src ? `<img src="${src[1]}">` : "<img>";
     }
-    // All other tags: strip all attributes
     return "<" + (tag[1] === "/" ? "/" : "") + name + ">";
   }
-  const strippedHtml = contentHtml
+  const strippedHtml = processedHtml
     .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>/g, stripAttrs)
     .replace(/\n\s*\n/g, "\n");
+
+  // Remove img tags whose src wasn't downloaded (external URL still there)
+  const finalHtml = strippedHtml.replace(/<img\s+src="https?:[^"]*">/gi, "")
 
   const xhtml = `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
@@ -329,9 +354,20 @@ function sendEpub(res, article) {
 </style>
 </head>
 <body>
-${strippedHtml}
+${finalHtml}
 </body>
 </html>`;
+
+  // Build manifest items — content + ncx + each image
+  const manifestItems = [
+    `    <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>`,
+    `    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
+  ];
+  let imgIdx = 0;
+  for (const [, img] of imageMap) {
+    const ext = img.path.split(".").pop();
+    manifestItems.push(`    <item id="img_${imgIdx++}" href="${img.path}" media-type="image/${ext === "png" ? "png" : "jpeg"}"/>`);
+  }
 
   // Content OPF
   const opf = `<?xml version="1.0" encoding="utf-8"?>
@@ -343,8 +379,7 @@ ${strippedHtml}
     <dc:language xmlns:dc="http://purl.org/dc/elements/1.1/">en</dc:language>
   </metadata>
   <manifest>
-    <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>
-    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+${manifestItems.join("\n")}
   </manifest>
   <spine toc="ncx">
     <itemref idref="content"/>
@@ -394,6 +429,11 @@ ${strippedHtml}
   archive.append(opf, { name: "OEBPS/content.opf", store: true });
   archive.append(ncx, { name: "OEBPS/toc.ncx", store: true });
   archive.append(xhtml, { name: "OEBPS/content.xhtml", store: true });
+
+  // Add downloaded images
+  for (const [, img] of imageMap) {
+    archive.append(img.data, { name: `OEBPS/${img.path}`, store: true });
+  }
 
   archive.finalize();
 }
