@@ -289,8 +289,35 @@ async function sendEpub(res, article) {
   // Build unique identifier
   const uuid = `urn:uuid:${crypto.randomUUID()}`;
 
-  // Strip HTML to safe allowlist — Crosspoint's slim parser only handles
-  // text blocks (paragraphs, links, lists) and chokes on img/media tags.
+  // ── Step 1: Download images ──
+  /** @type {Map<string, string>} */
+  const urlToLocal = new Map();
+  /** @type {Map<string, Buffer>} */
+  const localToData = new Map();
+  const imgUrls = [...contentHtml.matchAll(/<img[^>]+src="([^"]*)"/gi)].map(m => m[1]);
+  let imgIdx = 0;
+  await Promise.allSettled(
+    [...new Set(imgUrls)].map(async (url) => {
+      if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+        if (!resp.ok) return;
+        const buf = Buffer.from(await resp.arrayBuffer());
+        if (buf.length === 0 || buf.length > 10_000_000) return;
+        const local = `images/img_${imgIdx++}.jpg`;
+        urlToLocal.set(url, local);
+        localToData.set(local, buf);
+      } catch { /* best-effort */ }
+    })
+  );
+
+  // ── Step 2: Rewrite src URLs to local paths ──
+  let processedHtml = contentHtml;
+  for (const [url, local] of urlToLocal) {
+    processedHtml = processedHtml.replaceAll(url, local);
+  }
+
+  // ── Step 3: Strip tags to safe allowlist ──
   const ALLOWED_TAGS = new Set([
     "img", "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
     "h1", "h2", "h3", "h4", "h5", "h6", "div", "br", "hr",
@@ -311,12 +338,12 @@ async function sendEpub(res, article) {
     }
     return "<" + name + (SELF_CLOSING.has(name) ? "/>" : ">");
   }
-  const strippedHtml = contentHtml
+  const strippedHtml = processedHtml
     .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>/g, stripAttrs)
     .replace(/\n\s*\n/g, "\n");
 
-  // Remove any remaining img tags that slipped through
-  const finalHtml = strippedHtml.replace(/<img\s*>/gi, "");
+  // Remove img tags whose external URL couldn't be downloaded
+  const finalHtml = strippedHtml.replace(/<img\s+src="https?:[^"]*"\s*\/>/gi, "<img/>");
 
   const xhtml = `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
@@ -341,6 +368,10 @@ ${finalHtml}
     `    <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>`,
     `    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
   ];
+  let mi = 0;
+  for (const [local] of localToData) {
+    manifestItems.push(`    <item id="img_${mi++}" href="${local}" media-type="image/jpeg"/>`);
+  }
 
   // Content OPF
   const opf = `<?xml version="1.0" encoding="utf-8"?>
@@ -402,6 +433,11 @@ ${manifestItems.join("\n")}
   archive.append(opf, { name: "OEBPS/content.opf", store: true });
   archive.append(ncx, { name: "OEBPS/toc.ncx", store: true });
   archive.append(xhtml, { name: "OEBPS/content.xhtml", store: true });
+
+  // Add downloaded images
+  for (const [local, data] of localToData) {
+    archive.append(data, { name: `OEBPS/${local}`, store: true });
+  }
 
   archive.finalize();
 }
