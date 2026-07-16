@@ -292,17 +292,24 @@ async function sendEpub(res, article) {
   // Strip HTML to safe allowlist — Crosspoint's slim parser only handles
   // text blocks (paragraphs, links, lists) and chokes on img/media tags.
   const ALLOWED_TAGS = new Set([
-    "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
+    "img", "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
     "h1", "h2", "h3", "h4", "h5", "h6", "div", "br", "hr",
     "em", "strong", "i", "b", "pre", "code", "q",
     "dl", "dt", "dd",
     "table", "tr", "td", "th", "caption",
     "s", "u", "small", "ins", "del", "mark"
   ]);
+  const SELF_CLOSING = new Set(["img", "br", "hr"]);
   function stripAttrs(tag) {
-    const name = tag.replace(/^<\/?/, "").replace(/[\s\/>].*$/, "").toLowerCase();
+    const isClose = tag[1] === "/";
+    const name = (isClose ? tag.replace(/^<\//, "") : tag.replace(/^</, "")).replace(/[\s\/>].*$/, "").toLowerCase();
     if (!ALLOWED_TAGS.has(name)) return "";
-    return "<" + (tag[1] === "/" ? "/" : "") + name + ">";
+    if (isClose) return "</" + name + ">";
+    if (name === "img") {
+      const src = tag.match(/\ssrc="([^"]*)"/i);
+      return src ? `<img src="${src[1]}"/>` : "<img/>";
+    }
+    return "<" + name + (SELF_CLOSING.has(name) ? "/>" : ">");
   }
   const strippedHtml = contentHtml
     .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>/g, stripAttrs)
