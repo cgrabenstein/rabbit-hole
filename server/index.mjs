@@ -289,20 +289,26 @@ function sendEpub(res, article) {
   // Build unique identifier
   const uuid = `urn:uuid:${crypto.randomUUID()}`;
 
-  // Strip all attributes from HTML tags but keep the tags themselves
-  // Additionally, strip complex media elements that can confuse slim parsers
+  // Only keep HTML tags from a safe allowlist; strip everything else.
+  // This prevents unknown video/media/embed tags from crashing slim parsers.
+  const ALLOWED_TAGS = new Set([
+    "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
+    "h1", "h2", "h3", "h4", "h5", "h6", "div", "br", "hr",
+    "em", "strong", "i", "b", "pre", "code", "q",
+    "dl", "dt", "dd",
+    "table", "tr", "td", "th", "caption",
+    "s", "u", "small", "ins", "del", "mark"
+  ]);
   const strippedHtml = contentHtml
-    // Remove picture, source, img entirely (choke slim parsers)
-    .replace(/<\/?(?:picture|source|img)\s*[^>]*>/gi, "")
-    // Remove figure/figcaption wrappers (keep children)
-    .replace(/<\/?figure\s*[^>]*>/gi, "")
-    .replace(/<\/?figcaption\s*[^>]*>/gi, "")
-    // Remove empty span and em tags (keep content)
-    .replace(/<\/?span\s*[^>]*>/gi, "")
-    .replace(/<\/?em\s*[^>]*>/gi, "")
-    // Strip all remaining attributes
-    .replace(/<([a-zA-Z0-9]+)(?:\s[^>]*)?\s*\/?>/g, "<$1>")
-    .replace(/<\/([a-zA-Z0-9]+)\s*>/g, "</$1>")
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>/g, (tag) => {
+      const name = tag.replace(/^<\/?/, "").replace(/[\s\/>].*$/, "").toLowerCase();
+      if (ALLOWED_TAGS.has(name)) {
+        // Keep the tag but strip all attributes
+        return "<" + (tag[1] === "/" ? "/" : "") + name + ">";
+      }
+      // Strip disallowed tag entirely (keep its content)
+      return "";
+    })
     .replace(/\n\s*\n/g, "\n");
 
   const xhtml = `<?xml version="1.0" encoding="utf-8"?>
