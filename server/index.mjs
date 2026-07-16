@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
 import { initDB, upsertArticle, getArticles, getArticleById } from "./db.mjs";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, "..", "dist");
@@ -330,7 +330,7 @@ ${contentHtml}
 </container>`;
 
   // Build EPUB (ZIP) archive
-  const archive = archiver("zip", { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
 
   res.writeHead(200, {
     "Content-Type": "application/epub+zip",
