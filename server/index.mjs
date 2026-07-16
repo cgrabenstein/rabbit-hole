@@ -433,17 +433,46 @@ const server = createServer(async (req, res) => {
       if (!urlStr) return send(res, 400, { error: "Missing url parameter" });
 
       const response = await fetch(urlStr, {
-        signal: AbortSignal.timeout(8_000),
+        signal: AbortSignal.timeout(10_000),
       });
       const html = await response.text();
       const match = html.match(/<title[^>]*>([^<]+?)<\/title>/i);
       const title = match ? match[1].trim() : new URL(urlStr).hostname;
 
-      // Cache in DB for OPDS
+      // Cache in DB for OPDS — also run Readability so article content
+      // is immediately available for the OPDS acquisition feed.
       const cId = clientId(req);
+      const parsed = new URL(urlStr);
+      const domain = parsed.hostname.replace(/^www\./, "");
+
+      let content = null;
+      let author = null;
+      let publicationDate = null;
+
+      try {
+        const doc = new JSDOM(html, { url: urlStr });
+        const reader = new Readability(doc.window.document);
+        const article = reader.parse();
+        if (article) {
+          content = article.content;
+          author =
+            article.byline?.trim() ||
+            extractAuthorName(html, parsed.origin) ||
+            null;
+          publicationDate =
+            article.publishedTime?.trim() ||
+            extractPublicationDate(html) ||
+            null;
+        }
+      } catch { /* readability extraction is best-effort */ }
+
       if (cId) {
         upsertArticle(cId, urlStr, {
           title,
+          content,
+          author,
+          publication_date: publicationDate,
+          domain,
           created_at: new Date().toISOString(),
         });
       }
