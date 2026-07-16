@@ -9,4 +9,9 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+    volumes:
+      - rabbit-hole-data:/app/data
     restart: unless-stopped
+
+volumes:
+  rabbit-hole-data:
