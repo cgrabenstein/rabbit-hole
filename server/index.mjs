@@ -292,23 +292,27 @@ function sendEpub(res, article) {
   // Only keep HTML tags from a safe allowlist; strip everything else.
   // This prevents unknown video/media/embed tags from crashing slim parsers.
   const ALLOWED_TAGS = new Set([
-    "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
+    "img", "p", "a", "blockquote", "ol", "ul", "li", "sup", "sub",
     "h1", "h2", "h3", "h4", "h5", "h6", "div", "br", "hr",
     "em", "strong", "i", "b", "pre", "code", "q",
     "dl", "dt", "dd",
     "table", "tr", "td", "th", "caption",
     "s", "u", "small", "ins", "del", "mark"
   ]);
+  /** @param {string} tag */
+  function stripAttrs(tag) {
+    const name = tag.replace(/^<\/?/, "").replace(/[\s\/>].*$/, "").toLowerCase();
+    if (!ALLOWED_TAGS.has(name)) return "";
+    if (name === "img") {
+      // Keep src on img so the reader's IMAGE_BLOCK can resolve it
+      const src = tag.match(/\ssrc="([^"]*)"/i);
+      return src ? `<img src="${src[1]}">` : "<img>";
+    }
+    // All other tags: strip all attributes
+    return "<" + (tag[1] === "/" ? "/" : "") + name + ">";
+  }
   const strippedHtml = contentHtml
-    .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>/g, (tag) => {
-      const name = tag.replace(/^<\/?/, "").replace(/[\s\/>].*$/, "").toLowerCase();
-      if (ALLOWED_TAGS.has(name)) {
-        // Keep the tag but strip all attributes
-        return "<" + (tag[1] === "/" ? "/" : "") + name + ">";
-      }
-      // Strip disallowed tag entirely (keep its content)
-      return "";
-    })
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>/g, stripAttrs)
     .replace(/\n\s*\n/g, "\n");
 
   const xhtml = `<?xml version="1.0" encoding="utf-8"?>
