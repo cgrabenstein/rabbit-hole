@@ -290,7 +290,17 @@ function sendEpub(res, article) {
   const uuid = `urn:uuid:${crypto.randomUUID()}`;
 
   // Strip all attributes from HTML tags but keep the tags themselves
+  // Additionally, strip complex media elements that can confuse slim parsers
   const strippedHtml = contentHtml
+    // Remove picture and source entirely (keep their children)
+    .replace(/<\/?(?:picture|source)\s*[^>]*>/gi, "")
+    // Remove figure/figcaption wrappers (keep children)
+    .replace(/<\/?figure\s*[^>]*>/gi, "")
+    .replace(/<\/?figcaption\s*[^>]*>/gi, "")
+    // Remove empty span and em tags (keep content)
+    .replace(/<\/?span\s*[^>]*>/gi, "")
+    .replace(/<\/?em\s*[^>]*>/gi, "")
+    // Strip all remaining attributes
     .replace(/<([a-zA-Z0-9]+)(?:\s[^>]*)?\s*\/?>/g, "<$1>")
     .replace(/<\/([a-zA-Z0-9]+)\s*>/g, "</$1>")
     .replace(/\n\s*\n/g, "\n");
