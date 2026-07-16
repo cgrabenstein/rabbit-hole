@@ -289,20 +289,11 @@ function sendEpub(res, article) {
   // Build unique identifier
   const uuid = `urn:uuid:${crypto.randomUUID()}`;
 
-  // Strip HTML to just text for maximum parser compatibility
-  const plainText = contentHtml
-    .replace(/<[^>]+>/g, "")
-    .replace(/&[a-z]+;/g, (m) => ({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&apos;": "'" })[m] || m)
-    .replace(/&[#]?[0-9a-zA-Z]+;/g, "")
-    .replace(/\n\s*\n/g, "\n\n")
-    .trim();
-
-  // XHTML content — wrap as plain paragraphs for widest compat
-  const paragraphs = plainText
-    .split(/\n\n+/)
-    .filter(p => p.trim())
-    .map(p => `<p>${xmlEsc(p.trim())}</p>`)
-    .join("\n");
+  // Strip all attributes from HTML tags but keep the tags themselves
+  const strippedHtml = contentHtml
+    .replace(/<([a-zA-Z0-9]+)(?:\s[^>]*)?\s*\/?>/g, "<$1>")
+    .replace(/<\/([a-zA-Z0-9]+)\s*>/g, "</$1>")
+    .replace(/\n\s*\n/g, "\n");
 
   const xhtml = `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
@@ -310,9 +301,15 @@ function sendEpub(res, article) {
 <head>
 <meta charset="utf-8"/>
 <title>${xmlEsc(title)}</title>
+<style>
+  body { font-family: serif; line-height: 1.6; max-width: 40em; margin: 0 auto; padding: 1em; }
+  img { max-width: 100%; height: auto; }
+  pre { overflow-x: auto; white-space: pre-wrap; }
+  a { color: #2563eb; }
+</style>
 </head>
 <body>
-${paragraphs}
+${strippedHtml}
 </body>
 </html>`;
 
