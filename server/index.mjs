@@ -289,22 +289,30 @@ function sendEpub(res, article) {
   // Build unique identifier
   const uuid = `urn:uuid:${crypto.randomUUID()}`;
 
-  // XHTML content — wrap the Readability HTML in a valid XHTML document
+  // Strip HTML to just text for maximum parser compatibility
+  const plainText = contentHtml
+    .replace(/<[^>]+>/g, "")
+    .replace(/&[a-z]+;/g, (m) => ({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&apos;": "'" })[m] || m)
+    .replace(/&[#]?[0-9a-zA-Z]+;/g, "")
+    .replace(/\n\s*\n/g, "\n\n")
+    .trim();
+
+  // XHTML content — wrap as plain paragraphs for widest compat
+  const paragraphs = plainText
+    .split(/\n\n+/)
+    .filter(p => p.trim())
+    .map(p => `<p>${xmlEsc(p.trim())}</p>`)
+    .join("\n");
+
   const xhtml = `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8"/>
 <title>${xmlEsc(title)}</title>
-<style>
-  body { font-family: serif; line-height: 1.6; max-width: 40em; margin: 0 auto; padding: 1em; }
-  img { max-width: 100%; height: auto; }
-  pre { overflow-x: auto; white-space: pre-wrap; }
-  a { color: #2563eb; }
-</style>
 </head>
 <body>
-${contentHtml}
+${paragraphs}
 </body>
 </html>`;
 
@@ -352,8 +360,9 @@ ${contentHtml}
   </rootfiles>
 </container>`;
 
-  // Build EPUB (ZIP) archive
-  const archive = new ZipArchive({ zlib: { level: 9 } });
+  // Build EPUB (ZIP) archive — store-only (no compression) to avoid
+  // embedded ZIP library edge cases on memory-constrained e-readers
+  const archive = new ZipArchive();
 
   res.writeHead(200, {
     "Content-Type": "application/epub+zip",
@@ -364,10 +373,10 @@ ${contentHtml}
 
   // mimetype MUST be first, stored uncompressed
   archive.append("application/epub+zip", { name: "mimetype", store: true });
-  archive.append(container, { name: "META-INF/container.xml" });
-  archive.append(opf, { name: "OEBPS/content.opf" });
-  archive.append(ncx, { name: "OEBPS/toc.ncx" });
-  archive.append(xhtml, { name: "OEBPS/content.xhtml" });
+  archive.append(container, { name: "META-INF/container.xml", store: true });
+  archive.append(opf, { name: "OEBPS/content.opf", store: true });
+  archive.append(ncx, { name: "OEBPS/toc.ncx", store: true });
+  archive.append(xhtml, { name: "OEBPS/content.xhtml", store: true });
 
   archive.finalize();
 }
