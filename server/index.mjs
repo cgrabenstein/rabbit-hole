@@ -292,8 +292,8 @@ function sendEpub(res, article) {
   // Strip all attributes from HTML tags but keep the tags themselves
   // Additionally, strip complex media elements that can confuse slim parsers
   const strippedHtml = contentHtml
-    // Remove picture and source entirely (keep their children)
-    .replace(/<\/?(?:picture|source)\s*[^>]*>/gi, "")
+    // Remove picture, source, img entirely (choke slim parsers)
+    .replace(/<\/?(?:picture|source|img)\s*[^>]*>/gi, "")
     // Remove figure/figcaption wrappers (keep children)
     .replace(/<\/?figure\s*[^>]*>/gi, "")
     .replace(/<\/?figcaption\s*[^>]*>/gi, "")
