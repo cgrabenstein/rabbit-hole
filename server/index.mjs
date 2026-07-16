@@ -253,6 +253,29 @@ function sanitizeFilename(s) {
 }
 
 /**
+ * Strip attributes and elements that can trip up lightweight EPUB parsers.
+ * Removes HTMX/Alpine/JS framework attributes, empty wrapper divs, and script tags.
+ * @param {string} html
+ * @returns {string}
+ */
+function simplifyHtml(html) {
+  return html
+    // Remove script tags and their content
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    // Remove HTMX attributes (hx-*)
+    .replace(/ hx-[a-zA-Z-]+="[^"]*"/gi, "")
+    // Remove Alpine.js attributes (x-*, @*, :*)
+    .replace(/ x-[a-zA-Z-:]+="[^"]*"/gi, "")
+    .replace(/ @[a-zA-Z-]+="[^"]*"/gi, "")
+    .replace(/ :[a-zA-Z-]+="[^"]*"/gi, "")
+    // Remove data-* and aria-* attributes
+    .replace(/ data-[a-zA-Z-]+="[^"]*"/gi, "")
+    .replace(/ aria-[a-zA-Z-]+="[^"]*"/gi, "")
+    // Collapse multiple blank lines
+    .replace(/\n\s*\n\s*/g, "\n");
+}
+
+/**
  * Stream a minimal EPUB (EPUB 2) for an article to the response.
  * @param {import("node:http").ServerResponse} res
  * @param {{title:string;author:string|null;content:string;url:string}} article
@@ -260,7 +283,7 @@ function sanitizeFilename(s) {
 function sendEpub(res, article) {
   const title = article.title || "Untitled";
   const author = article.author || "";
-  const contentHtml = article.content || "";
+  const contentHtml = simplifyHtml(article.content || "");
   const filename = sanitizeFilename(title) + ".epub";
 
   // Build unique identifier
