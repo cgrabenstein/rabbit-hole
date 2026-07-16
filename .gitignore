@@ -6,3 +6,4 @@ dist/
 *.tsbuildinfo
 .deploy.env
 docker-compose.prod.yml
+data/
